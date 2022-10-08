@@ -1,0 +1,196 @@
+
+*************Install Linux, Nginx, MySQL, PHP (LEMP stack) on Ubuntu 22.04************
+
+ ********Installing the Nginx Web Server*******
+
+	step:01   sudo apt update
+	step:02   sudo apt install nginx  
+	step:03   sudo ufw app list
+    
+ Output
+            Available applications:
+            Nginx Full
+            Nginx HTTP
+            Nginx HTTPS
+            OpenSSH 
+
+	step:04 sudo ufw allow 'Nginx HTTP'  
+	step:05 sudo ufw allow 'OpenSSH'  
+	step:06 sudo ufw status
+
+    Output
+            Status: active
+
+            To                         Action      From
+            --                         ------      ----
+            OpenSSH                    ALLOW       Anywhere
+            Nginx HTTP                 ALLOW       Anywhere
+            OpenSSH (v6)               ALLOW       Anywhere (v6)
+            Nginx HTTP (v6)            ALLOW       Anywhere (v6)
+
+	step:07  ip addr show
+	step:08  hostname -I  
+	step:09  curl -4 icanhazip.com  
+
+    Write the address that you receive in your web browser and it will take you to Nginx’s default landing page:
+	
+
+    **************Installing MySQL************* 
+
+     step:01 sudo apt install mysql-server
+
+     When prompted, confirm installation by pressing Y, and then ENTER.
+
+     step:02 sudo mysql_secure_installation
+
+     Output
+        VALIDATE PASSWORD COMPONENT can be used to test passwords
+        and improve security. It checks the strength of password
+        and allows the users to set only those passwords which are
+        secure enough. Would you like to setup VALIDATE PASSWORD component?
+
+        Press y|Y for Yes, any other key for No:
+
+     If you answer “yes”, you’ll be asked to select a level of password validation. Keep in mind that if you enter 2 for the strongest level, you will receive errors when attempting to set any password that does not contain numbers, upper and lowercase letters, and special characters:
+
+     Output
+            There are three levels of password validation policy:
+
+            LOW    Length >= 8
+            MEDIUM Length >= 8, numeric, mixed case, and special characters
+            STRONG Length >= 8, numeric, mixed case, special characters and dictionary              file
+
+            Please enter 0 = LOW, 1 = MEDIUM and 2 = STRONG: 1
+            If you enabled password validation, you’ll be shown the password strength for the root password you entered and your server will ask if you want to continue with that password. If you are happy with your current password, press Y for “yes” at the prompt:
+
+When you’re finished, test if you’re able to log in to the MySQL console:
+
+    step:04 sudo mysql
+
+ Output
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 10
+Server version: 8.0.28-0ubuntu4 (Ubuntu)
+
+Copyright (c) 2000, 2022, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql>
+
+To exit the MySQL console,write the following:
+mysql> exit
+
+*****Installing PHP*****
+
+step:01 sudo apt install php8.1-fpm php-mysql
+
+When prompted, press Y and ENTER to confirm the installation.
+
+
+
+******Configuring Nginx to Use the PHP Processor******
+
+On Ubuntu 22.04, Nginx has one server block enabled by default and is configured to serve documents out of a directory at /var/www/html. While this works well for a single site, it can become difficult to manage if you are hosting multiple sites. Instead of modifying /var/www/html, we’ll create a directory structure within /var/www for the your_domain website, leaving /var/www/html in place as the default directory to be served if a client request doesn’t match any other sites.
+
+****Create the root web directory for your_domain as follows:******
+
+step:01 sudo mkdir /var/www/your_domain
+
+Next, assign ownership of the directory with the $USER environment variable, which will reference your current system user:
+
+step:02 sudo chown -R $USER:$USER /var/www/your_domain
+
+step:03 sudo nano /etc/nginx/sites-available/your_domain
+
+This will create a new blank file. Insert the following bare-bones configuration:
+
+    server {
+        listen 80;
+        server_name your_domain www.your_domain;
+        root /var/www/your_domain;
+
+        index index.html index.htm index.php;
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        }
+
+        location ~ /\.ht {
+            deny all;
+        }
+
+    }
+
+    When you’re done editing, save and close the file. If you’re using nano, you can do so by pressing CTRL+X and then Y and ENTER to confirm.
+
+Activate your configuration by linking to the configuration file from Nginx’s sites-enabled directory:
+    
+    sudo ln -s /etc/nginx/sites-available/your_domain /etc/nginx/sites-enabled/
+
+Then, unlink the default configuration file from the /sites-enabled/ directory:
+
+     sudo unlink /etc/nginx/sites-enabled/default
+    
+     sudo nginx -t
+     sudo systemctl reload nginx
+     systemctl start nginx
+     systemctl status nginx
+     systemctl enable nginx
+
+*****Testing PHP with Nginx******
+
+ step:01 nano /var/www/your_domain/info.php 
+
+  <?php
+phpinfo();
+
+When you are finished, save and close the file.
+
+http://server_domain_or_IP/info.php
+
+After checking the relevant information about your PHP server through that page, it’s best to remove the file you created as it contains sensitive information about your PHP environment and your Ubuntu server. You can use rm to remove that file:
+sudo rm /var/www/your_domain/info.php
+
+
+--------Create MySQL Database-------
+
+step:01 sudo mysql
+
+step:02 CREATE DATABASE example_database;
+
+step:03 CREATE USER 'example_user'@'%' IDENTIFIED WITH mysql_native_password BY 'password';
+
+step:04 GRANT ALL ON example_database.* TO 'example_user'@'%';
+
+step:05 FLUSH PRIVILEGES;
+
+step:06 exit
+
+You can test if the new user has the proper permissions by logging in to the MySQL console again, this time using the custom user credentials. Notice the -p flag in this command, which will prompt you for the password used when creating the example_user user:
+
+    mysql -u example_user -p
+
+    SHOW DATABASES;
+
+
+Output
++--------------------+
+| Database           |
++--------------------+
+| example_database   |
+| information_schema |
++--------------------+
+2 rows in set (0.000 sec)
+
+
+
